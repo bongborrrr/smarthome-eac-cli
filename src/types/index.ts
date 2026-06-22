@@ -12,6 +12,12 @@ export interface UserProfile {
   wfIdText: string;      // Full display like "YG Park (박영걸)"
   kostl: string;         // Cost center, e.g. "226020"
   kostlText: string;     // "Device Engineering"
+  /**
+   * Business area (사업영역), e.g. "K200" / "K300". MUST match the cost center —
+   * EAC rejects vouchers whose debit/credit business areas differ (ZUNIEFI_1009).
+   * Optional for backward compat; falls back to "K200" when absent.
+   */
+  gsber?: string;
   wfDept: string;        // Department code
   wfDeptText: string;    // "Service Engineering"
 }

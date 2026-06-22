@@ -2,7 +2,7 @@
 
 Generic CLI for `eac.zigbang.in` (E-Accounting / UniDocu).
 
-Drives the UniDocu named-service API directly over HTTP. No headless browser at runtime — auth is just the `JSESSIONID` cookie pulled out of your local Chrome profile.
+Drives the UniDocu named-service API directly over HTTP. No headless browser at runtime — auth is just the `JSESSIONID` cookie pulled out of your local browser profile (Chrome by default; Comet/Brave/Edge selectable via `EAC_BROWSER`).
 
 The CLI intentionally stays **domain-agnostic**: it only knows about EAC data and verbs. Company-/personal-specific policy (e.g. *"자기관리비 환급은 영수증 × 70%"*) belongs in your own shell scripts or runbooks.
 
@@ -16,21 +16,31 @@ brew install zigbang-smarthome/tap/eac-cli
 curl -fsSL https://github.com/zigbang-smarthome/eac-cli/releases/latest/download/install.sh | sh
 ```
 
-Before first use: open Chrome and log in to `https://eac.zigbang.in` at least once so the session cookie lands in your Chrome cookie store. The CLI reads that cookie each run.
+Before first use: open your browser and log in to `https://eac.zigbang.in` at least once so the session cookie lands in your browser's cookie store. The CLI reads that cookie each run.
 
 ## Authentication
 
-- EAC uses Google SSO + MS Azure AD SAML — login itself can't be automated. The CLI piggybacks on your normal Chrome session.
-- Each run, `eac` copies Chrome's cookie DB to tmpdir, decrypts the `JSESSIONID` for `*.zigbang.in` (AES-128-CBC, key from `"Chrome Safe Storage"` Keychain), and pings EAC to confirm the session is alive.
-- **If the session is missing or expired**, the CLI opens Chrome at `https://eac.zigbang.in/unidocu/view.do` and prompts:
-  1. Finish the Google SSO login in Chrome.
-  2. **Quit Chrome (Cmd+Q)** so the new `JSESSIONID` is flushed to disk. Chrome's cookie monster keeps cookies in memory and writes to the SQLite store on a delayed batch schedule — without an explicit quit the CLI may keep reading a stale value.
-  3. Return to the terminal and hit Enter — the CLI re-reads the fresh cookie and continues.
-  4. Reopen Chrome normally afterwards.
+- EAC uses Google SSO + MS Azure AD SAML — login itself can't be automated. The CLI piggybacks on your normal browser session.
+- Each run, `eac` copies the browser's cookie DB to tmpdir, decrypts the `JSESSIONID` for `*.zigbang.in` (AES-128-CBC, key from the `"<Browser> Safe Storage"` Keychain), and pings EAC to confirm the session is alive.
+- **Browser selection** — set `EAC_BROWSER` to choose which Chromium-family browser to read from (default: `chrome`):
 
-  Tip: turn on Chrome → Settings → On startup → *"Continue where you left off"* so the session cookie survives the Cmd+Q cycle. EAC re-login becomes infrequent (only when the SAP-side session truly expires).
+  | `EAC_BROWSER` | Browser |
+  | --- | --- |
+  | `chrome` (default) | Google Chrome |
+  | `comet` | Comet (Perplexity) |
+  | `brave` | Brave |
+  | `edge` | Microsoft Edge |
+
+  All share the same cookie format on macOS; only the cookie path and Keychain service name differ. Example: `EAC_BROWSER=comet eac voucher list`.
+- **If the session is missing or expired**, the CLI opens the selected browser at `https://eac.zigbang.in/unidocu/view.do` and prompts:
+  1. Finish the Google SSO login in the browser.
+  2. **Quit the browser (Cmd+Q)** so the new `JSESSIONID` is flushed to disk. Chromium keeps cookies in memory and writes to the SQLite store on a delayed batch schedule — without an explicit quit the CLI may keep reading a stale value.
+  3. Return to the terminal and hit Enter — the CLI re-reads the fresh cookie and continues.
+  4. Reopen the browser normally afterwards.
+
+  Tip: turn on the browser's *"Continue where you left off"* startup option so the session cookie survives the Cmd+Q cycle. EAC re-login becomes infrequent (only when the SAP-side session truly expires).
 - macOS may prompt for Keychain access the first time (click *Always Allow*).
-- Override: set `EAC_JSESSIONID=<value>` to bypass the keychain entirely and use a cookie sourced elsewhere (e.g. extracted from Playwright/CDP-controlled Chrome). Useful when EAC is open in a non-default Chrome profile or in CI scripts.
+- Override: set `EAC_JSESSIONID=<value>` to bypass the keychain entirely and use a cookie sourced elsewhere (e.g. extracted from Playwright/CDP-controlled browser). Useful when EAC is open in a non-default profile or in CI scripts.
 - Non-TTY environments (CI, piped scripts) error out instead of prompting — pass `EAC_JSESSIONID` explicitly there.
 
 ---
@@ -186,6 +196,7 @@ eac call ZUNIEFI_4207 --prog DRAFT_0010 --data '{"GRONO":"FI20260000023922"}'
 
 - `config show` — 현재 config JSON 프린트
 - `config init` — `~/.config/eac/config.json` 없으면 기본값 생성
+- `user.gsber` — 사업영역(business area). **비용센터(`user.kostl`)와 일치**시켜야 한다. EAC는 전표의 차변/대변 사업영역이 다르면 거부한다(`Please input only the same 'Business Area'`, ZUNIEFI_1009). 미설정 시 `K200`으로 fallback하므로, 비용센터가 K300 영역(e.g. `343000`)이면 `gsber: "K300"`을 반드시 설정한다.
 
 ---
 

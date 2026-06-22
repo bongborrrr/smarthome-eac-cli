@@ -486,7 +486,7 @@ export async function computeDefaults(
   const r = await callNS(ctx, "ZUNIEFI_4003", PROG_LEGACY, {
     BUDAT: budat, BLDAT: bldat, BLART: "KE",
     LIFNR: user.pernr, LIFNR_TXT: user.pernrName,
-    BUPLA: "K100", GSBER: "K200", MWSKZ: "T0",
+    BUPLA: "K100", GSBER: user.gsber ?? "K200", MWSKZ: "T0",
     AKONT: "21020103", ZTERM: "V123",
     WRBTR: String(amountWon), WRBTR_SLASH: "", WMWST: "0",
     BVTYP: "0001", ZFBDT: "", ZFBDT_SLASH: "",
@@ -529,7 +529,7 @@ export async function createTempDoc(
   const commonFi = {
     BUDAT: budat, BLDAT: bldat, BLART: "KE",
     LIFNR: user.pernr, LIFNR_TXT: user.pernrName,
-    BUPLA: "K100", GSBER: "K200", MWSKZ: "T0",
+    BUPLA: "K100", GSBER: user.gsber ?? "K200", MWSKZ: "T0",
     AKONT: "21020103", ZTERM: "V123",
     WRBTR: String(amountWon), WRBTR_SLASH: "", WMWST: "0",
     BVTYP: "0001", ZFBDT: zfbdt, ZFBDT_SLASH: "",
@@ -929,7 +929,7 @@ export async function createCorpCardVoucher(
     CHARGETOTAL: card.AMOUNT, CHARGETOTAL_Slash: "",
     WMWST_READ_ONLY: card.TAX,
     BUDAT: p.budat, BLDAT: bldat, BLART: "KE",
-    BUPLA: "K100", GSBER: "K200",
+    BUPLA: "K100", GSBER: user.gsber ?? "K200",
     WRBTR_SLASH: "", WMWST: card.TAX,
     ZFBDT_SLASH: "", EMPTY: "",
     SGTXT: p.sgtxt,

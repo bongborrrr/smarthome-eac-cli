@@ -53,6 +53,7 @@ export const DEFAULT_CONFIG: EacConfig = {
     wfIdText: "YG Park (박영걸)",
     kostl: "226020",
     kostlText: "Device Engineering",
+    gsber: "K200", // 사업영역 — 비용센터와 일치시킬 것 (e.g. kostl 343000 → "K300")
     wfDept: "0000252100",
     wfDeptText: "Service Engineering",
   },
