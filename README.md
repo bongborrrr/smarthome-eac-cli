@@ -119,8 +119,22 @@ eac
 --bldat <YYYYMMDD>   영수증 날짜
 --budat <YYYYMMDD>   전기일자 (default: today)
 --amount <won>       금액 (정수)
+--line <spec>        비용항목 1행 "<preset>:<amount>[:<적요>]". 반복하면 한 전표에 여러 행 (--item/--amount 대신)
 --attach-dir <path>  첨부 폴더 (optional)
 ```
+
+한 달 여러 건을 행으로 모아 전표 1장으로 내야 할 때 (예: 자기관리비 2건 + 가족식사비 1건):
+```sh
+eac voucher create --title "2026년 9월 자기관리비/가족식사비" \
+  --bldat 20260927 --budat 20261001 \
+  --line "자기관리비:21000:9월 6일 / 9월 자기관리비" \
+  --line "자기관리비:21000:9월 22일 / 9월 자기관리비" \
+  --line "가족식사비:300000:9월 27일 / 3분기 가족식사비" \
+  --attach-dir ./장려지원금/202609
+```
+- 적요를 생략하면 `--title`이 행 적요로 들어간다.
+- 모든 행의 preset은 같은 `evikb`(예: `FI_21` 장려지원금)여야 한다. 결재선은 첫 행의 preset 기준.
+- `--amount`/헤더 금액은 행 합계로 자동 계산.
 
 **`voucher request-approval <BELNR>`** — 결재요청. Steps 6-11. GRONO 발급 + 실제 상신. `--attach-dir` 필수 (결재 레이어 첨부).
 

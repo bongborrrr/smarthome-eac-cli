@@ -56,6 +56,29 @@ function collectAttachments(dir: string): string[] {
 
 export { collectAttachments };
 
+/**
+ * `--line "<preset>:<amount>[:<적요>]"` 를 반복 수집한다. citty 는 같은 플래그가
+ * 여러 번 오면 마지막 값만 남길 수 있어 rawArgs 에서 직접 읽는다.
+ * 적요에는 ':' 가 들어갈 수 있으므로 앞의 두 개만 구분자로 쓴다.
+ */
+function parseLineArgs(rawArgs: string[]): Array<{ preset: string; amountWon: number; sgtxt?: string }> {
+  const values: string[] = [];
+  for (let i = 0; i < rawArgs.length; i++) {
+    const a = rawArgs[i]!;
+    if (a === "--line" && i + 1 < rawArgs.length) values.push(rawArgs[++i]!);
+    else if (a.startsWith("--line=")) values.push(a.slice("--line=".length));
+  }
+  return values.map((v) => {
+    const [preset, amount, ...rest] = v.split(":");
+    const amountWon = parseInt(amount ?? "", 10);
+    if (!preset || !Number.isFinite(amountWon) || amountWon <= 0) {
+      throw new Error(`invalid --line "${v}" (expected "<preset>:<amount>[:<적요>]")`);
+    }
+    const sgtxt = rest.join(":").trim();
+    return { preset, amountWon, sgtxt: sgtxt || undefined };
+  });
+}
+
 /* ── list ───────────────────────────────────────────────────────── */
 
 const listSub = defineCommand({
@@ -134,22 +157,31 @@ const showSub = defineCommand({
 const createSub = defineCommand({
   meta: { name: "create", description: "전표 작성 (Steps 1-5 → BELNR). No approval yet." },
   args: {
-    item: { type: "string", required: true, description: "Preset name from config.items" },
+    item: { type: "string", description: "Preset name from config.items (required unless --line is given)" },
     title: { type: "string", required: true, description: "Document title" },
     budat: { type: "string", description: "Posting date YYYYMMDD (default: today)" },
     bldat: { type: "string", required: true, description: "Receipt date YYYYMMDD" },
-    amount: { type: "string", required: true, description: "Amount in won (integer)" },
+    amount: { type: "string", description: "Amount in won (integer). Required unless --line is given" },
+    line: { type: "string", description: "비용항목 1행: \"<preset>:<amount>[:<적요>]\". Repeat for multiple rows in one 전표 (replaces --item/--amount)" },
     "attach-dir": { type: "string", description: "Directory of attachment files (optional at create)" },
   },
-  async run({ args }) {
+  async run({ args, rawArgs }) {
     const { ctx, cfg } = await loadCtx();
+    const lines = parseLineArgs(rawArgs).map((l) => ({ ...l, item: resolveItem(cfg, l.preset) }));
+    if (lines.length > 0) {
+      const evikbs = new Set(lines.map((l) => l.item.evikb));
+      if (evikbs.size > 1) throw new Error(`--line presets must share one evikb (got ${[...evikbs].join(", ")})`);
+    } else if (!args.item || !args.amount) {
+      throw new Error("either --line (repeatable) or both --item and --amount are required");
+    }
     const res = await createTempDoc(ctx, {
       user: requireUser(cfg),
-      item: resolveItem(cfg, args.item),
+      item: lines[0]?.item ?? resolveItem(cfg, args.item!),
       title: args.title,
       budat: args.budat ?? today(),
       bldat: args.bldat,
-      amountWon: parseInt(args.amount, 10),
+      amountWon: lines.length ? 0 : parseInt(args.amount!, 10),
+      lines: lines.map(({ item, amountWon, sgtxt }) => ({ item, amountWon, sgtxt })),
       attachFiles: args["attach-dir"] ? collectAttachments(args["attach-dir"]) : [],
     });
     console.log(`BELNR            ${res.belnr}`);

@@ -507,6 +507,14 @@ function computeZfbdtFallback(bldat: string): string {
   return `${next.getFullYear()}${pad(next.getMonth() + 1)}${pad(next.getDate())}`;
 }
 
+/** 비용항목 1행. 여러 행이면 한 전표에 IT_DATA 로 함께 저장된다. */
+export interface VoucherLine {
+  item: ReimbursementItem;
+  amountWon: number;
+  /** 행 적요. 생략하면 전표 제목(title)을 쓴다. */
+  sgtxt?: string;
+}
+
 /** Steps 1-5: Create a temp document (ZUNIEFI_4003 → 5030 → upload → 4006 → 5000). */
 export async function createTempDoc(
   ctx: ClientContext,
@@ -518,9 +526,15 @@ export async function createTempDoc(
     bldat: string;
     amountWon: number;
     attachFiles: string[];
+    /** 여러 행 전표. 주면 item/amountWon 대신 이 행들로 IT_DATA 를 만들고 amountWon 은 합계로 덮어쓴다. */
+    lines?: VoucherLine[];
   },
 ): Promise<{ eviSeqEa: string; belnr: string; zfbdt: string }> {
-  const { user, item, title, budat, bldat, amountWon, attachFiles } = params;
+  const { user, item, title, budat, bldat, attachFiles } = params;
+  const lines: VoucherLine[] = params.lines?.length
+    ? params.lines
+    : [{ item, amountWon: params.amountWon }];
+  const amountWon = lines.reduce((s, l) => s + l.amountWon, 0);
 
   const { zfbdt } = await computeDefaults(ctx, user, bldat, budat, amountWon, title);
   const eviSeqEa = await createAttachSeq(ctx, PROG_LEGACY);
@@ -542,15 +556,15 @@ export async function createTempDoc(
     searchCondition: "HKONT", searchWord: "",
     EVI_SEQ: eviSeqEa,
     tableParamsString: JSON.stringify({
-      IT_DATA: [{
+      IT_DATA: lines.map((l) => ({
         SELECTED: "1", SHKZG: "S",
-        HKONT: item.hkont, HKONT_: "", HKONT_TXT: item.hkontText,
-        WRBTR: String(amountWon),
+        HKONT: l.item.hkont, HKONT_: "", HKONT_TXT: l.item.hkontText,
+        WRBTR: String(l.amountWon),
         KOSTL: user.kostl, KOSTL_: "", KOSTL_TXT: user.kostlText,
         PROJK: "", PROJK_: "", PROJK_TXT: "",
-        MWSKZ: "T0", SGTXT: title,
+        MWSKZ: "T0", SGTXT: l.sgtxt ?? title,
         ADD_DATA: "", ADD_DATA__HIDDEN: "", ADD_DATA_JSON: "",
-      }],
+      })),
       IT_ATTACH: [],
     }),
   };
